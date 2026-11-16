@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CL-002 | Animal Atlas</title>
+  <link rel="icon" type="image/png" href="logo.png">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+  <style>
+    :root {
+      --bg: #101b1f;
+      --panel: #19282d;
+      --panel2: #203238;
+      --border: #30464c;
+      --text: #e7eff0;
+      --muted: #9bb2b8;
+      --accent: #8bb9aa;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Arial, sans-serif;
+    }
+
+    header {
+      height: 72px;
+      padding: 13px 22px;
+      background: #19282d;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logo {
+      font-weight: bold;
+      letter-spacing: 2px;
+      font-size: 17px;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 5px;
+    }
+
+    .version {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: 290px minmax(300px, 1fr) 330px;
+      gap: 12px;
+      padding: 12px;
+      height: calc(100vh - 72px);
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 11px;
+      padding: 15px;
+      min-height: 0;
+      overflow-y: auto;
+    }
+
+    .section-title {
+      color: #a9c5ca;
+      font-size: 13px;
+      letter-spacing: 1px;
+      margin-bottom: 14px;
+    }
+
+    input,
+    select {
+      width: 100%;
+      background: #101b1f;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 12px;
+      border-radius: 7px;
+      margin-bottom: 10px;
+      font-size: 15px;
+    }
+
+    .animal {
+      background: var(--panel2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 11px;
+      margin-bottom: 8px;
+      cursor: pointer;
+    }
+
+    .animal:hover,
+    .animal.active {
+      border-color: var(--accent);
+      background: #293f43;
+    }
+
+    .animal-name {
+      font-size: 16px;
+    }
+
+    .latin {
+      color: var(--accent);
+      font-style: italic;
+      font-size: 13px;
+      margin-top: 5px;
+    }
+
+    .map-panel {
+      position: relative;
+      padding: 0;
+      overflow: hidden;
+      border-radius: 11px;
+      border: 1px solid var(--border);
+      background: #dce5e4;
+    }
+
+    #map {
+      width: 100%;
+      height: 100%;
+      min-height: 300px;
+    }
+
+    /* Мягкая цветовая обработка природного слоя */
+    .leaflet-nature-pane {
+      filter: saturate(0.55) brightness(1.12);
+    }
+
+    .map-controls {
+      position: absolute;
+      z-index: 1000;
+      top: 14px;
+      right: 14px;
+      background: rgba(25, 40, 45, 0.95);
+      border: 1px solid #52666b;
+      border-radius: 9px;
+      padding: 12px;
+      color: white;
+      width: 205px;
+      font-size: 13px;
+    }
+
+    .map-controls label {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin: 10px 0;
+      cursor: pointer;
+    }
+
+    .map-controls input {
+      width: auto;
+      margin: 0;
+      accent-color: #8bb9aa;
+    }
+
+    .map-controls .disabled {
+      color: #789096;
+      cursor: not-allowed;
+    }
+
+    .map-controls .disabled input {
+      cursor: not-allowed;
+    }
+
+    .map-status {
+      color: #a9c5ca;
+      font-size: 11px;
+      margin-top: 9px;
+      line-height: 1.4;
+    }
+
+    .animal-photo {
+      width: 100%;
+      height: 205px;
+      object-fit: cover;
+      border-radius: 8px;
+      background: #263b40;
+      margin-bottom: 12px;
+    }
+
+    .detail-name {
+      font-size: 23px;
+      margin: 0 0 5px;
+    }
+
+    .detail-section {
+      border-top: 1px solid var(--border);
+      padding: 12px 0;
+      margin-top: 12px;
+    }
+
+    .detail-label {
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 7px;
+      letter-spacing: 0.5px;
+    }
+
+    .detail-text {
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    .source {
+      color: #8bb9aa;
+      font-size: 12px;
+    }
+
+    footer {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      padding: 5px 12px;
+      color: var(--muted);
+      font-size: 11px;
+      pointer-events: none;
+    }
+
+    @media (max-width: 950px) {
+      main {
+        grid-template-columns: 230px minmax(250px, 1fr);
+        height: auto;
+        min-height: calc(100vh - 72px);
+      }
+
+      .details-panel {
+        grid-column: 1 / -1;
+      }
+
+      .map-panel {
+        min-height: 550px;
+      }
+    }
+
+    @media (max-width: 600px) {
+      main {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .map-panel {
+        min-height: 430px;
+      }
+
+      header {
+        padding: 12px;
+      }
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand img {
+      width: 48px;
+      height: 48px;
+      object-fit: contain;
+    }
+  </style>
+</head>
+
+<body>
+
+  <header>
+    <div>
+      <div class="brand">
+        <img src="logo.png" alt="Animal Atlas">
+        <div>
+          <div class="logo">CL-002 / ANIMAL ATLAS</div>
+          <div class="subtitle">GLOBAL BIODIVERSITY INFORMATION SYSTEM</div>
+        </div>
+      </div>
+      <div class="subtitle">GLOBAL BIODIVERSITY INFORMATION SYSTEM</div>
+    </div>
+    <div class="version">VERSION 1.0</div>
+  </header>
+
+  <main>
+
+    <!-- КАТАЛОГ -->
+    <section class="panel">
+      <div class="section-title">КАТАЛОГ ЖИВОТНЫХ</div>
+
+      <input id="search" placeholder="Поиск вида...">
+
+      <select id="category">
+        <option value="all">Все категории</option>
+        <option value="mammals">Млекопитающие</option>
+        <option value="fish">Рыбы</option>
+        <option value="birds">Птицы</option>
+        <option value="amphibians">Земноводные</option>
+        <option value="cetaceans">Китообразные</option>
+      </select>
+
+      <div id="animal-list"></div>
+    </section>
+
+    <!-- КАРТА -->
+    <section class="map-panel">
+      <div id="map"></div>
+
+      <div class="map-controls">
+        <strong>СЛОИ КАРТЫ</strong>
+
+        <label>
+          <input type="checkbox" id="base-toggle" checked>
+          Географическая карта
+        </label>
+
+        <label>
+          <input type="checkbox" id="nature-toggle">
+          Природный слой
+        </label>
+
+        <label class="disabled" title="Научные ареалы будут подключены позже">
+          <input type="checkbox" disabled>
+          Ареалы видов — скоро
+        </label>
+
+        <div class="map-status" id="layer-status">
+          Природный слой выключен.
+        </div>
+      </div>
+    </section>
+
+    <!-- КАРТОЧКА -->
+    <section class="panel details-panel">
+      <div class="section-title">КАРТОЧКА ВИДА</div>
+
+      <img id="animal-photo" class="animal-photo" alt="Фотография животного">
+
+      <h2 class="detail-name" id="animal-name">Выберите животное</h2>
+      <div class="latin" id="animal-latin"></div>
+
+      <div class="detail-section">
+        <div class="detail-label">ОПИСАНИЕ</div>
+        <div class="detail-text" id="animal-description">
+          Выберите вид из каталога.
+        </div>
+      </div>
+
+      <div class="detail-section">
+        <div class="detail-label">ПИТАНИЕ</div>
+        <div class="detail-text" id="animal-food">—</div>
+      </div>
+
+      <div class="detail-section">
+        <div class="detail-label">СРЕДА ОБИТАНИЯ</div>
+        <div class="detail-text" id="animal-habitat">—</div>
+      </div>
+
+      <div class="detail-section">
+        <div class="detail-label">РАСПРОСТРАНЕНИЕ</div>
+        <div class="detail-text" id="animal-range">—</div>
+      </div>
+
+      <div class="detail-section">
+        <div class="detail-label">ИСТОЧНИК ФОТОГРАФИИ</div>
+        <div class="source" id="photo-source">
+          Фотография ещё не загружена.
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer>CL-002 ANIMAL ATLAS | © OpenStreetMap | © ESA WorldCover</footer>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+
+    // ======================================
+    // 1. БАЗА ЖИВОТНЫХ
+    // ======================================
+
+    const animals = [
+
+      {
+        id: 1, category: "mammals",
+        name: "Волк", latin: "Canis lupus",
+        wiki: "Gray wolf",
+        description: "Крупный хищник семейства псовых. Живёт поодиночке или в социальных группах.",
+        food: "Преимущественно мясо.",
+        habitat: "Леса, степи, тундра и горные районы.",
+        range: "Европа, Азия и Северная Америка."
+      },
+      {
+        id: 2, category: "mammals",
+        name: "Лев", latin: "Panthera leo",
+        wiki: "Lion",
+        description: "Крупный представитель семейства кошачьих. Известен социальной организацией прайдов.",
+        food: "Мясо.",
+        habitat: "Саванны и открытые редколесья.",
+        range: "Преимущественно Африка; небольшая популяция в Индии."
+      },
+      {
+        id: 3, category: "mammals",
+        name: "Тигр", latin: "Panthera tigris",
+        wiki: "Tiger",
+        description: "Крупная дикая кошка с характерной полосатой окраской.",
+        food: "Мясо.",
+        habitat: "Леса, болота и травянистые территории.",
+        range: "Отдельные районы Азии."
+      },
+      {
+        id: 4, category: "mammals",
+        name: "Африканский слон", latin: "Loxodonta africana",
+        wiki: "African bush elephant",
+        description: "Крупнейшее современное наземное животное.",
+        food: "Растения, листья, кора и трава.",
+        habitat: "Саванны и редколесья.",
+        range: "Африка к югу от Сахары."
+      },
+      {
+        id: 5, category: "mammals",
+        name: "Жираф", latin: "Giraffa camelopardalis",
+        wiki: "Giraffe",
+        description: "Высокое африканское млекопитающее с длинной шеей.",
+        food: "Листья и побеги деревьев.",
+        habitat: "Саванны и редколесья.",
+        range: "Различные регионы Африки."
+      },
+
+      {
+        id: 6, category: "fish",
+        name: "Большая белая акула", latin: "Carcharodon carcharias",
+        wiki: "Great white shark",
+        description: "Крупная хищная акула, обитающая в морских водах.",
+        food: "Рыба и морские животные.",
+        habitat: "Прибрежные и открытые воды океанов.",
+        range: "Умеренные и некоторые тропические моря."
+      },
+      {
+        id: 7, category: "fish",
+        name: "Китовая акула", latin: "Rhincodon typus",
+        wiki: "Whale shark",
+        description: "Самая крупная современная рыба.",
+        food: "Планктон и мелкие организмы.",
+        habitat: "Тёплые тропические моря.",
+        range: "Тропические и субтропические воды."
+      },
+      {
+        id: 8, category: "fish",
+        name: "Атлантический голубой тунец", latin: "Thunnus thynnus",
+        wiki: "Atlantic bluefin tuna",
+        description: "Крупная быстро плавающая морская рыба.",
+        food: "Рыба и головоногие моллюски.",
+        habitat: "Открытые морские воды.",
+        range: "Атлантический океан и прилегающие моря."
+      },
+      {
+        id: 9, category: "fish",
+        name: "Щука", latin: "Esox lucius",
+        wiki: "Northern pike",
+        description: "Пресноводная хищная рыба с вытянутым телом.",
+        food: "Рыба и другие водные животные.",
+        habitat: "Озёра, реки и заросшие водоёмы.",
+        range: "Северная Америка, Европа и Азия."
+      },
+      {
+        id: 10, category: "fish",
+        name: "Сазан", latin: "Cyprinus carpio",
+        wiki: "Common carp",
+        description: "Крупная пресноводная рыба семейства карповых.",
+        food: "Водные беспозвоночные и растительный материал.",
+        habitat: "Реки, озёра и пруды.",
+        range: "Евразия; широко расселён человеком."
+      },
+
+      {
+        id: 11, category: "birds",
+        name: "Беркут", latin: "Aquila chrysaetos",
+        wiki: "Golden eagle",
+        description: "Крупный хищный представитель семейства ястребиных.",
+        food: "Мелкие и средние животные.",
+        habitat: "Горы, степи и открытые ландшафты.",
+        range: "Северное полушарие."
+      },
+      {
+        id: 12, category: "birds",
+        name: "Сапсан", latin: "Falco peregrinus",
+        wiki: "Peregrine falcon",
+        description: "Хищная птица, известная высокой скоростью пикирования.",
+        food: "Преимущественно другие птицы.",
+        habitat: "Скалы, побережья и города.",
+        range: "Почти весь мир."
+      },
+      {
+        id: 13, category: "birds",
+        name: "Африканский страус", latin: "Struthio camelus",
+        wiki: "Common ostrich",
+        description: "Крупная нелетающая птица.",
+        food: "Растения и мелкие животные.",
+        habitat: "Саванны и полупустыни.",
+        range: "Африка."
+      },
+      {
+        id: 14, category: "birds",
+        name: "Императорский пингвин", latin: "Aptenodytes forsteri",
+        wiki: "Emperor penguin",
+        description: "Самый крупный современный вид пингвинов.",
+        food: "Рыба, криль и головоногие.",
+        habitat: "Антарктический морской лёд и океан.",
+        range: "Антарктида."
+      },
+      {
+        id: 15, category: "birds",
+        name: "Ворон", latin: "Corvus corax",
+        wiki: "Common raven",
+        description: "Крупная птица семейства врановых.",
+        food: "Всеяден.",
+        habitat: "Леса, горы, тундра и открытые территории.",
+        range: "Большая часть Северного полушария."
+      },
+
+      {
+        id: 16, category: "amphibians",
+        name: "Обыкновенная лягушка", latin: "Rana temporaria",
+        wiki: "Common frog",
+        description: "Земноводное, распространённое в значительной части Европы.",
+        food: "Насекомые и другие беспозвоночные.",
+        habitat: "Влажные леса, луга и водоёмы.",
+        range: "Европа."
+      },
+      {
+        id: 17, category: "amphibians",
+        name: "Обыкновенная жаба", latin: "Bufo bufo",
+        wiki: "Common toad",
+        description: "Наземное земноводное с характерной бугристой кожей.",
+        food: "Насекомые и другие беспозвоночные.",
+        habitat: "Леса, сады и влажные места.",
+        range: "Европа и отдельные районы Азии."
+      },
+      {
+        id: 18, category: "amphibians",
+        name: "Аксолотль", latin: "Ambystoma mexicanum",
+        wiki: "Axolotl",
+        description: "Неотеническая саламандра, сохраняющая личиночные признаки.",
+        food: "Водные беспозвоночные и мелкие животные.",
+        habitat: "Пресноводные озёра и каналы.",
+        range: "Исторически система озёр Мехико."
+      },
+      {
+        id: 19, category: "amphibians",
+        name: "Огненная саламандра", latin: "Salamandra salamandra",
+        wiki: "Fire salamander",
+        description: "Земноводное с заметным чёрно-жёлтым рисунком.",
+        food: "Насекомые, черви и другие беспозвоночные.",
+        habitat: "Влажные леса.",
+        range: "Европа."
+      },
+      {
+        id: 20, category: "amphibians",
+        name: "Обыкновенный тритон", latin: "Lissotriton vulgaris",
+        wiki: "Smooth newt",
+        description: "Небольшое хвостатое земноводное.",
+        food: "Мелкие водные беспозвоночные.",
+        habitat: "Пруды, канавы и влажные места.",
+        range: "Европа и западные районы Азии."
+      },
+
+      {
+        id: 21, category: "cetaceans",
+        name: "Синий кит", latin: "Balaenoptera musculus",
+        wiki: "Blue whale",
+        description: "Крупнейшее известное животное, когда-либо жившее на Земле.",
+        food: "Преимущественно криль.",
+        habitat: "Открытые воды океанов.",
+        range: "Океаны по всему миру."
+      },
+      {
+        id: 22, category: "cetaceans",
+        name: "Горбатый кит", latin: "Megaptera novaeangliae",
+        wiki: "Humpback whale",
+        description: "Крупный кит, известный сложными песнями и миграциями.",
+        food: "Криль и мелкая рыба.",
+        habitat: "Морские воды.",
+        range: "Все основные океаны."
+      },
+      {
+        id: 23, category: "cetaceans",
+        name: "Косатка", latin: "Orcinus orca",
+        wiki: "Orca",
+        description: "Крупный зубатый кит семейства дельфиновых.",
+        food: "Рыба и другие морские животные.",
+        habitat: "Прибрежные и открытые воды.",
+        range: "Все океаны."
+      },
+      {
+        id: 24, category: "cetaceans",
+        name: "Белуха", latin: "Delphinapterus leucas",
+        wiki: "Beluga whale",
+        description: "Арктический зубатый кит светлой окраски.",
+        food: "Рыба и беспозвоночные.",
+        habitat: "Арктические и субарктические воды.",
+        range: "Северные моря."
+      },
+      {
+        id: 25, category: "cetaceans",
+        name: "Афалина", latin: "Tursiops truncatus",
+        wiki: "Common bottlenose dolphin",
+        description: "Известный вид дельфинов с хорошо развитым социальным поведением.",
+        food: "Рыба и головоногие моллюски.",
+        habitat: "Прибрежные и открытые морские воды.",
+        range: "Моря и океаны по всему миру."
+      }
+
+    ];
+
+    // ======================================
+    // 2. КАРТА
+    // ======================================
+
+    const map = L.map("map", {
+      center: [25, 10],
+      zoom: 2,
+      minZoom: 2,
+      maxZoom: 10,
+      worldCopyJump: true
+    });
+
+    const baseLayer = L.tileLayer(
+      "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      {
+        maxZoom: 19,
+        attribution: "&copy; OpenStreetMap contributors"
+      }
+    ).addTo(map);
+
+    // Отдельная панель для природного слоя
+    map.createPane("naturePane");
+    map.getPane("naturePane").style.zIndex = 450;
+    map.getPane("naturePane").classList.add("leaflet-nature-pane");
+
+    // Настоящие спутниковые данные ESA WorldCover 2021
+    const natureLayer = L.tileLayer.wms(
+      "https://services.terrascope.be/wms/v2",
+      {
+        layers: "WORLDCOVER_2021_MAP",
+        format: "image/png",
+        transparent: true,
+        version: "1.1.1",
+        opacity: 0.34,
+        pane: "naturePane",
+        attribution: "ESA WorldCover 2021"
+      }
+    );
+
+    const natureToggle = document.getElementById("nature-toggle");
+    const baseToggle = document.getElementById("base-toggle");
+    const layerStatus = document.getElementById("layer-status");
+
+    natureToggle.addEventListener("change", () => {
+      if (natureToggle.checked) {
+        natureLayer.addTo(map);
+        layerStatus.textContent =
+          "Природный слой ESA WorldCover 2021 включён.";
+      } else {
+        map.removeLayer(natureLayer);
+        layerStatus.textContent =
+          "Природный слой выключен.";
+      }
+    });
+
+    baseToggle.addEventListener("change", () => {
+      if (baseToggle.checked) {
+        baseLayer.addTo(map);
+      } else {
+        map.removeLayer(baseLayer);
+      }
+    });
+
+    natureLayer.on("tileerror", () => {
+      layerStatus.textContent =
+        "Не удалось загрузить природный слой. Проверьте интернет-соединение.";
+    });
+
+    // ======================================
+    // 3. КАТАЛОГ
+    // ======================================
+
+    const list = document.getElementById("animal-list");
+    const search = document.getElementById("search");
+    const category = document.getElementById("category");
+
+    let selectedAnimal = null;
+
+    function renderAnimals() {
+      list.innerHTML = "";
+
+      const query = search.value.toLowerCase();
+      const selectedCategory = category.value;
+
+      const filtered = animals.filter(animal => {
+        const matchesSearch =
+          animal.name.toLowerCase().includes(query) ||
+          animal.latin.toLowerCase().includes(query);
+
+        const matchesCategory =
+          selectedCategory === "all" ||
+          animal.category === selectedCategory;
+
+        return matchesSearch && matchesCategory;
+      });
+
+      filtered.forEach(animal => {
+        const item = document.createElement("div");
+        item.className = "animal";
+
+        if (selectedAnimal && selectedAnimal.id === animal.id) {
+          item.classList.add("active");
+        }
+
+        item.innerHTML = `
+      <div class="animal-name">${animal.name}</div>
+      <div class="latin">${animal.latin}</div>
+    `;
+
+        item.addEventListener("click", () => {
+          selectAnimal(animal);
+        });
+
+        list.appendChild(item);
+      });
+
+      if (filtered.length === 0) {
+        list.innerHTML =
+          "<p class='subtitle'>Виды не найдены.</p>";
+      }
+    }
+
+    search.addEventListener("input", renderAnimals);
+    category.addEventListener("change", renderAnimals);
+
+    // ======================================
+    // 4. КАРТОЧКА ЖИВОТНОГО
+    // ======================================
+
+    let photoRequestId = 0;
+
+    async function selectAnimal(animal) {
+      selectedAnimal = animal;
+      photoRequestId++;
+
+      const requestId = photoRequestId;
+
+      renderAnimals();
+
+      document.getElementById("animal-name").textContent =
+        animal.name;
+
+      document.getElementById("animal-latin").textContent =
+        animal.latin;
+
+      document.getElementById("animal-description").textContent =
+        animal.description;
+
+      document.getElementById("animal-food").textContent =
+        animal.food;
+
+      document.getElementById("animal-habitat").textContent =
+        animal.habitat;
+
+      document.getElementById("animal-range").textContent =
+        animal.range;
+
+      const photo = document.getElementById("animal-photo");
+      const source = document.getElementById("photo-source");
+
+      photo.removeAttribute("src");
+      photo.alt = "Загрузка фотографии...";
+      source.textContent = "Загрузка изображения...";
+
+      try {
+        const url =
+          "https://en.wikipedia.org/api/rest_v1/page/summary/" +
+          encodeURIComponent(animal.wiki);
+
+        const response = await fetch(url);
+
+        if (!response.ok) {
+          throw new Error("Фото недоступно");
+        }
+
+        const data = await response.json();
+
+        // Не показываем результат старого запроса,
+        // если пользователь уже выбрал другое животное.
+        if (requestId !== photoRequestId) return;
+
+        if (data.thumbnail && data.thumbnail.source) {
+          photo.src = data.thumbnail.source;
+          photo.alt = animal.name;
+
+          source.innerHTML =
+            'Изображение: <a href="' +
+            data.content_urls.desktop.page +
+            '" target="_blank" rel="noopener">Wikipedia</a>';
+        } else {
+          source.textContent =
+            "Фотография для этого вида не найдена.";
+        }
+
+      } catch (error) {
+        if (requestId !== photoRequestId) return;
+
+        source.textContent =
+          "Не удалось загрузить фотографию. Проверьте интернет.";
+      }
+    }
+
+    // ======================================
+    // 5. ЗАПУСК
+    // ======================================
+
+    renderAnimals();
+
+    // Начальный выбранный вид
+    selectAnimal(animals[0]);
+
+    // Исправление размеров карты после построения интерфейса
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 300);
+
+  </script>
+</body>
+
+</html>
